@@ -1,0 +1,20 @@
+name: github-trending
+url: https://github.com/trending
+dynamic: false
+cache: 600
+delay: 1000
+
+feed:
+  title: GitHub Trending Repositories
+  description: Trending repositories on GitHub today
+  link: https://github.com
+  language: en
+
+selectors:
+  item: "article.Box-row"
+  fields:
+    title: "h2 a"
+    link: "h2 a | href"
+    description: "p.col-9"
+    author: "span.d-inline-block a"
+    category: "span[itemprop='programmingLanguage']"

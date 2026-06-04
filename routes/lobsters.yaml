@@ -1,0 +1,21 @@
+name: lobsters
+url: https://lobste.rs/
+dynamic: false
+cache: 300
+delay: 0
+
+feed:
+  title: Lobsters - Technology News
+  description: Computing-focused community centered around link aggregation and discussion
+  link: https://lobste.rs
+  language: en
+
+selectors:
+  item: ".story"
+  fields:
+    title: ".story_liner .link a"
+    link: ".story_liner .link a | href"
+    description: ".story_liner .link a"
+    author: ".byline a[href^='/u/']"
+    category: ".tags a"
+    pubDate: ".byline span[title]| title"

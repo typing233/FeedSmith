@@ -1,0 +1,20 @@
+name: reddit-programming
+url: https://old.reddit.com/r/programming/
+dynamic: false
+cache: 300
+delay: 1500
+
+feed:
+  title: Reddit - r/programming
+  description: Latest posts from the programming subreddit
+  link: https://old.reddit.com/r/programming
+  language: en
+
+selectors:
+  item: "#siteTable .thing.link"
+  fields:
+    title: "a.title"
+    link: "a.title | href"
+    description: "a.title"
+    author: ".tagline a.author"
+    pubDate: "time | datetime"
