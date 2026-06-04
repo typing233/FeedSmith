@@ -1,11 +1,10 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
-import { glob } from 'glob';
 import { RouteConfig, PluginRoute } from '../types';
 
 const DEFAULT_ROUTES_DIR = path.resolve(process.cwd(), 'routes');
-const PLUGINS_DIR = path.resolve(process.cwd(), 'src/plugins');
+const PLUGINS_DIR = path.resolve(process.cwd(), 'dist/plugins');
 
 export function loadRoutes(routesDir?: string): Map<string, RouteConfig> {
   const dir = routesDir || DEFAULT_ROUTES_DIR;
@@ -31,26 +30,46 @@ export function loadRoutes(routesDir?: string): Map<string, RouteConfig> {
   return routes;
 }
 
-export async function loadPlugins(): Promise<Map<string, PluginRoute>> {
+export function loadPlugins(): Map<string, PluginRoute> {
   const plugins = new Map<string, PluginRoute>();
 
   if (!fs.existsSync(PLUGINS_DIR)) {
     return plugins;
   }
 
-  const files = await glob('*.{js,ts}', { cwd: PLUGINS_DIR });
+  const files = fs.readdirSync(PLUGINS_DIR).filter(f => f.endsWith('.js'));
 
   for (const file of files) {
     try {
-      const pluginPath = path.join(PLUGINS_DIR, file);
-      const plugin = require(pluginPath) as PluginRoute;
+      const pluginPath = path.resolve(PLUGINS_DIR, file);
+      delete require.cache[pluginPath];
+      const mod = require(pluginPath);
+      const plugin: PluginRoute = mod.default || mod;
       if (plugin && plugin.name && plugin.config) {
         plugins.set(plugin.name, plugin);
+        console.log(`  Plugin loaded: ${plugin.name} (${file})`);
       }
-    } catch (err) {
-      console.warn(`Failed to load plugin ${file}:`, err);
+    } catch (err: any) {
+      console.warn(`  Failed to load plugin ${file}: ${err.message}`);
     }
   }
 
   return plugins;
+}
+
+export function loadAllRoutes(routesDir?: string): {
+  routes: Map<string, RouteConfig>;
+  plugins: Map<string, PluginRoute>;
+} {
+  const routes = loadRoutes(routesDir);
+  const plugins = loadPlugins();
+
+  for (const [name, plugin] of plugins) {
+    if (!routes.has(name)) {
+      routes.set(name, plugin.config);
+      console.log(`  Plugin registered new route: ${name}`);
+    }
+  }
+
+  return { routes, plugins };
 }

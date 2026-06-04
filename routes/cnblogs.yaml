@@ -1,0 +1,20 @@
+name: cnblogs
+url: https://www.cnblogs.com/
+dynamic: false
+cache: 300
+delay: 500
+
+feed:
+  title: 博客园 - 最新博文
+  description: 博客园开发者社区最新技术文章
+  link: https://www.cnblogs.com
+  language: zh-cn
+
+selectors:
+  item: ".post-item"
+  fields:
+    title: ".post-item-title"
+    link: ".post-item-title | href"
+    description: ".post-item-summary"
+    author: ".post-item-author"
+    pubDate: ".post-meta-item"

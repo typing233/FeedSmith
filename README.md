@@ -7,7 +7,7 @@ A configurable RSS feed generator that scrapes web pages and serves them as subs
 - **YAML-based route configuration** — define target URL, CSS selectors, and field mappings
 - **Static & dynamic fetching** — built-in HTTP client for static pages, Puppeteer for JS-rendered content
 - **Anti-detection** — user-agent rotation, configurable request delays, response caching
-- **Plugin architecture** — extend routes with custom transform logic
+- **Plugin architecture** — extend routes with custom transform logic, or register entirely new routes via plugins
 - **RSS 2.0 compliant** — generates valid XML feeds consumable by any RSS reader
 - **Hot reload** — reload route configs without restarting the server
 
@@ -132,25 +132,56 @@ This launches a headless Chromium instance via Puppeteer to fully render the pag
 
 ## Plugin System
 
-For advanced customization, create a plugin in `src/plugins/`:
+Plugins live in `src/plugins/` and are compiled to `dist/plugins/`. They can either:
+1. **Hook into an existing YAML route** — add a `transform` function to filter/modify items
+2. **Register a new route** — if no YAML route matches the plugin's `name`, it becomes a standalone route
+
+### Creating a Plugin
 
 ```typescript
-// src/plugins/my-transform.ts
+// src/plugins/my-custom-feed.ts
 import { PluginRoute, FeedItem } from '../types';
 
 const plugin: PluginRoute = {
-  name: 'my-site',  // Must match a route name
-  config: { /* override config if needed */ },
+  name: 'my-custom-feed',
+  config: {
+    name: 'my-custom-feed',
+    url: 'https://example.com/articles',
+    dynamic: false,
+    cache: 300,
+    delay: 0,
+    feed: {
+      title: 'My Custom Feed',
+      description: 'Articles from example.com',
+      link: 'https://example.com',
+      language: 'en',
+    },
+    selectors: {
+      item: 'article.post',
+      fields: {
+        title: 'h2 a',
+        link: 'h2 a | href',
+        description: 'p.summary',
+      },
+    },
+  },
   transform(items: FeedItem[]): FeedItem[] {
-    // Filter, modify, or enrich items
-    return items.filter(item => !item.title.includes('[Ad]'));
+    // Optional: filter, enrich, or modify items
+    return items.filter(item => !item.title.includes('[Sponsored]'));
   },
 };
 
-module.exports = plugin;
+export = plugin;
 ```
 
-Plugins are loaded by name — a plugin with `name: 'my-site'` automatically hooks into the `my-site` route.
+After creating a plugin, rebuild (`npm run build`) and restart the server. The plugin will be auto-loaded from `dist/plugins/` and its route will appear in the route list.
+
+### Plugin Loading Behavior
+
+- Plugins are loaded from the compiled `dist/plugins/` directory at startup
+- If a plugin's `name` matches an existing YAML route, the plugin's `transform` function hooks into that route
+- If no matching YAML route exists, the plugin's `config` is registered as a new route
+- Hot-reload (`POST /routes/reload`) reloads both YAML routes and plugins
 
 ## Anti-Detection Features
 
@@ -254,10 +285,9 @@ FeedSmith/
 ├── routes/              # YAML route configurations
 │   ├── hackernews.yaml
 │   ├── github-trending.yaml
-│   ├── producthunt.yaml
-│   ├── reddit-programming.yaml
-│   ├── lobsters.yaml
-│   └── dev-to.yaml
+│   ├── dev-to.yaml
+│   ├── cnblogs.yaml
+│   └── sspai.yaml
 ├── src/
 │   ├── index.ts         # Entry point
 │   ├── types.ts         # TypeScript interfaces
@@ -275,10 +305,12 @@ FeedSmith/
 │   │   └── index.ts     # RSS 2.0 XML generator
 │   ├── server/
 │   │   └── index.ts     # Express HTTP server
-│   └── plugins/         # Custom route plugins
-│       └── hackernews-enhanced.ts
+│   └── plugins/         # Plugin-based route extensions
+│       ├── echojs.ts            # Registers new /feed/echojs route
+│       └── hackernews-newest.ts # Registers new /feed/hackernews-newest route
 ├── package.json
-└── tsconfig.json
+├── tsconfig.json
+└── Dockerfile
 ```
 
 ## License

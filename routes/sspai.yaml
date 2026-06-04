@@ -1,0 +1,19 @@
+name: sspai
+url: https://sspai.com/
+dynamic: false
+cache: 300
+delay: 500
+
+feed:
+  title: 少数派 - 最新文章
+  description: 少数派最新优质内容推荐
+  link: https://sspai.com
+  language: zh-cn
+
+selectors:
+  item: "a.article__card__link"
+  fields:
+    title: ".article__card__title"
+    link: "& | href"
+    description: ".article__card__desc"
+    author: ".article__card__author .nickname"
