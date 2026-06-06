@@ -1,0 +1,20 @@
+name: Dev.to Latest
+description: Latest articles from Dev.to
+url: https://dev.to/
+dynamic: false
+itemSelector: ".crayons-story"
+fields:
+  title: ".crayons-story__title a"
+  link: ".crayons-story__title a@href"
+  description: ".crayons-story__tags"
+  author: ".crayons-story__meta a.crayons-story__secondary"
+  pubDate: "time@datetime"
+  category: ".crayons-tag:first-child"
+feed:
+  title: "Dev.to - Latest Articles"
+  link: "https://dev.to"
+  description: "Where programmers share ideas and help each other grow"
+  language: en
+cache:
+  ttl: 300
+delay: 1000

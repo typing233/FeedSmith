@@ -1,29 +1,24 @@
 {
   "name": "feedsmith",
   "version": "1.0.0",
-  "description": "Configurable RSS feed generator with static and dynamic page scraping",
+  "description": "A configurable RSS feed generator that scrapes websites and serves standardized RSS 2.0 feeds",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "ts-node src/index.ts"
+    "dev": "ts-node src/index.ts",
+    "watch": "tsc -w"
   },
-  "keywords": ["rss", "feed", "scraper", "puppeteer"],
+  "keywords": ["rss", "feed", "scraper", "web-scraping"],
   "license": "MIT",
   "dependencies": {
     "cheerio": "^1.0.0",
-    "express": "^4.18.2",
     "js-yaml": "^4.1.0",
-    "node-cache": "^5.1.2",
-    "puppeteer": "^22.0.0",
-    "rss": "^1.2.2",
-    "glob": "^10.3.10"
+    "puppeteer": "^22.0.0"
   },
   "devDependencies": {
-    "@types/express": "^4.17.21",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.11.0",
-    "@types/rss": "^0.0.32",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
   }

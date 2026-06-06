@@ -1,63 +1,86 @@
-import * as http from 'http';
 import * as https from 'https';
+import * as http from 'http';
 import { URL } from 'url';
-import { getRandomUserAgent } from './user-agents';
-import { getCached, setCache } from './cache';
-import { RouteConfig } from '../types';
+import { getRotatingUserAgent, delay } from '../cache/anti-scrape';
+import { RequestCache } from '../cache';
+import { AppConfig } from '../config/types';
 
-function delay(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+export interface FetchOptions {
+  userAgent?: string;
+  delayMs?: number;
+  cacheTtl?: number;
 }
 
-export async function fetchStatic(config: RouteConfig): Promise<string> {
-  const cacheKey = `static:${config.url}`;
-  const cached = getCached(cacheKey);
-  if (cached) return cached;
+export class StaticFetcher {
+  private cache: RequestCache;
+  private config: AppConfig;
 
-  if (config.delay) {
-    await delay(config.delay);
+  constructor(config: AppConfig) {
+    this.config = config;
+    this.cache = new RequestCache();
   }
 
-  const html = await httpGet(config.url);
-  setCache(cacheKey, html, config.cache || 600);
-  return html;
-}
+  async fetch(url: string, options: FetchOptions = {}): Promise<string> {
+    if (this.config.cache.enabled) {
+      const cached = this.cache.get(url);
+      if (cached) return cached;
+    }
 
-function httpGet(url: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const parsed = new URL(url);
-    const client = parsed.protocol === 'https:' ? https : http;
-    const options = {
-      hostname: parsed.hostname,
-      port: parsed.port,
-      path: parsed.pathname + parsed.search,
-      method: 'GET',
-      headers: {
-        'User-Agent': getRandomUserAgent(),
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'identity',
-        'Connection': 'keep-alive',
-      },
-    };
+    const delayMs = options.delayMs ?? this.config.antiScrape.defaultDelay;
+    if (delayMs > 0) await delay(delayMs);
 
-    const req = client.request(options, (res) => {
-      if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        resolve(httpGet(res.headers.location));
-        return;
-      }
+    const ua = this.config.antiScrape.rotateUserAgent
+      ? getRotatingUserAgent()
+      : (options.userAgent ?? 'FeedSmith/1.0');
 
-      let data = '';
-      res.setEncoding('utf-8');
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => resolve(data));
+    const html = await this.request(url, ua);
+
+    if (this.config.cache.enabled) {
+      this.cache.set(url, html, options.cacheTtl ?? this.config.cache.defaultTtl);
+    }
+
+    return html;
+  }
+
+  private request(url: string, userAgent: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const parsed = new URL(url);
+      const client = parsed.protocol === 'https:' ? https : http;
+
+      const req = client.get(
+        {
+          hostname: parsed.hostname,
+          port: parsed.port,
+          path: parsed.pathname + parsed.search,
+          headers: {
+            'User-Agent': userAgent,
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+          },
+        },
+        (res) => {
+          if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+            this.request(res.headers.location, userAgent).then(resolve).catch(reject);
+            return;
+          }
+
+          if (res.statusCode && res.statusCode >= 400) {
+            reject(new Error(`HTTP ${res.statusCode} for ${url}`));
+            return;
+          }
+
+          const chunks: Buffer[] = [];
+          res.on('data', chunk => chunks.push(chunk));
+          res.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')));
+          res.on('error', reject);
+        }
+      );
+
+      req.on('error', reject);
+      req.setTimeout(15000, () => {
+        req.destroy();
+        reject(new Error(`Timeout fetching ${url}`));
+      });
     });
-
-    req.on('error', reject);
-    req.setTimeout(15000, () => {
-      req.destroy();
-      reject(new Error(`Request timeout: ${url}`));
-    });
-    req.end();
-  });
+  }
 }

@@ -1,0 +1,21 @@
+name: Reddit Programming
+description: Top posts from r/programming
+url: https://old.reddit.com/r/programming/
+dynamic: false
+itemSelector: "#siteTable > .thing.link"
+fields:
+  title: "a.title"
+  link: "a.title@href"
+  description: ".expando .usertext-body"
+  author: ".author"
+  pubDate: "time@datetime"
+  category: ".linkflairlabel"
+feed:
+  title: "Reddit r/programming"
+  link: "https://www.reddit.com/r/programming"
+  description: "Computer programming news and discussion"
+  language: en
+cache:
+  ttl: 300
+delay: 2000
+userAgent: "FeedSmith/1.0 (RSS Generator)"

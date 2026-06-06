@@ -1,0 +1,20 @@
+name: Lobsters
+description: Technology-focused community link aggregator
+url: https://lobste.rs/
+dynamic: false
+itemSelector: ".story"
+fields:
+  title: ".story_liner .link a"
+  link: ".story_liner .link a@href"
+  description: ".story_liner .tags a"
+  author: ".byline a[href^='/u/']"
+  pubDate: ".byline span[title]@title"
+  category: ".tags .tag:first-child"
+feed:
+  title: "Lobsters"
+  link: "https://lobste.rs"
+  description: "Computing-focused community link aggregator"
+  language: en
+cache:
+  ttl: 300
+delay: 1500

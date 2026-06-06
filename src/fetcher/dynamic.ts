@@ -1,57 +1,68 @@
-import puppeteer, { Browser } from 'puppeteer';
-import { getRandomUserAgent } from './user-agents';
-import { getCached, setCache } from './cache';
-import { RouteConfig } from '../types';
+import { getRotatingUserAgent, delay } from '../cache/anti-scrape';
+import { RequestCache } from '../cache';
+import { AppConfig } from '../config/types';
+import { FetchOptions } from './static';
 
-let browserInstance: Browser | null = null;
+export class DynamicFetcher {
+  private cache: RequestCache;
+  private config: AppConfig;
+  private browser: any = null;
 
-async function getBrowser(): Promise<Browser> {
-  if (!browserInstance || !browserInstance.connected) {
-    browserInstance = await puppeteer.launch({
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-      ],
-    });
-  }
-  return browserInstance;
-}
-
-export async function fetchDynamic(config: RouteConfig): Promise<string> {
-  const cacheKey = `dynamic:${config.url}`;
-  const cached = getCached(cacheKey);
-  if (cached) return cached;
-
-  if (config.delay) {
-    await new Promise(resolve => setTimeout(resolve, config.delay));
+  constructor(config: AppConfig) {
+    this.config = config;
+    this.cache = new RequestCache();
   }
 
-  const browser = await getBrowser();
-  const page = await browser.newPage();
+  async fetch(url: string, options: FetchOptions & { waitFor?: string } = {}): Promise<string> {
+    if (this.config.cache.enabled) {
+      const cached = this.cache.get(url);
+      if (cached) return cached;
+    }
 
-  try {
-    await page.setUserAgent(getRandomUserAgent());
-    await page.setViewport({ width: 1920, height: 1080 });
-    await page.goto(config.url, { waitUntil: 'networkidle2', timeout: 30000 });
+    const delayMs = options.delayMs ?? this.config.antiScrape.defaultDelay;
+    if (delayMs > 0) await delay(delayMs);
 
-    if (config.waitFor) {
-      await page.waitForSelector(config.waitFor, { timeout: 10000 });
+    const html = await this.renderPage(url, options);
+
+    if (this.config.cache.enabled) {
+      this.cache.set(url, html, options.cacheTtl ?? this.config.cache.defaultTtl);
+    }
+
+    return html;
+  }
+
+  private async renderPage(url: string, options: FetchOptions & { waitFor?: string }): Promise<string> {
+    const puppeteer = await import('puppeteer');
+
+    if (!this.browser) {
+      this.browser = await puppeteer.default.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+      });
+    }
+
+    const page = await this.browser.newPage();
+
+    const ua = this.config.antiScrape.rotateUserAgent
+      ? getRotatingUserAgent()
+      : (options.userAgent ?? 'FeedSmith/1.0');
+
+    await page.setUserAgent(ua);
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+
+    if (options.waitFor) {
+      await page.waitForSelector(options.waitFor, { timeout: 10000 });
     }
 
     const html = await page.content();
-    setCache(cacheKey, html, config.cache || 600);
-    return html;
-  } finally {
     await page.close();
+    return html;
   }
-}
 
-export async function closeBrowser(): Promise<void> {
-  if (browserInstance) {
-    await browserInstance.close();
-    browserInstance = null;
+  async close(): Promise<void> {
+    if (this.browser) {
+      await this.browser.close();
+      this.browser = null;
+    }
   }
 }

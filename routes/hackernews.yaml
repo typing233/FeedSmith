@@ -1,18 +1,18 @@
-name: hackernews
+name: Hacker News
+description: Top stories from Hacker News
 url: https://news.ycombinator.com/
 dynamic: false
-cache: 300
-delay: 0
-
+itemSelector: ".athing"
+fields:
+  title: ".titleline > a"
+  link: ".titleline > a@href"
+  author: "+ tr .hnuser"
+  pubDate: "+ tr .age@title"
 feed:
-  title: Hacker News - Front Page
-  description: Links from the front page of Hacker News
-  link: https://news.ycombinator.com
+  title: "Hacker News - Top Stories"
+  link: "https://news.ycombinator.com"
+  description: "Links for the intellectually curious"
   language: en
-
-selectors:
-  item: ".athing"
-  fields:
-    title: ".titleline > a"
-    link: ".titleline > a | href"
-    description: ".titleline > a"
+cache:
+  ttl: 300
+delay: 1000

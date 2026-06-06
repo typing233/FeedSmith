@@ -1,0 +1,19 @@
+name: Product Hunt
+description: Today's top products on Product Hunt
+url: https://www.producthunt.com/
+dynamic: true
+waitFor: "[data-test='post-item']"
+itemSelector: "[data-test='post-item']"
+fields:
+  title: "a[data-test='post-name'] strong"
+  link: "a[data-test='post-name']@href"
+  description: "a[data-test='post-tagline']"
+  category: "[data-test='post-topics'] a:first-child"
+feed:
+  title: "Product Hunt - Today's Top Products"
+  link: "https://www.producthunt.com"
+  description: "The best new products, every day"
+  language: en
+cache:
+  ttl: 600
+delay: 3000

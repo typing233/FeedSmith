@@ -1,0 +1,14 @@
+server:
+  port: 3000
+  host: "0.0.0.0"
+
+cache:
+  enabled: true
+  defaultTtl: 300  # seconds
+
+antiScrape:
+  rotateUserAgent: true
+  defaultDelay: 1000  # ms
+
+routesDir: "./routes"
+pluginsDir: "./plugins"

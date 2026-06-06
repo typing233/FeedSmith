@@ -1,16 +1,22 @@
 import * as cheerio from 'cheerio';
-import { Element } from 'domhandler';
-import { URL } from 'url';
-import { RouteConfig, FeedItem, SelectorConfig } from '../types';
+import { RouteConfig, RouteFieldMapping } from '../config/types';
 
-export function parseItems(html: string, config: RouteConfig): FeedItem[] {
+export interface FeedItem {
+  title: string;
+  link: string;
+  description?: string;
+  pubDate?: string;
+  author?: string;
+  category?: string;
+  guid?: string;
+}
+
+export function parseHtml(html: string, route: RouteConfig): FeedItem[] {
   const $ = cheerio.load(html);
-  const { selectors } = config;
   const items: FeedItem[] = [];
-  const baseUrl = new URL(config.url);
 
-  $(selectors.item).each((_, el) => {
-    const item = extractItem($, el as Element, selectors, baseUrl);
+  $(route.itemSelector).each((_, element) => {
+    const item = extractItem($, $(element), route.fields, route.url);
     if (item.title && item.link) {
       items.push(item);
     }
@@ -21,50 +27,77 @@ export function parseItems(html: string, config: RouteConfig): FeedItem[] {
 
 function extractItem(
   $: cheerio.CheerioAPI,
-  el: Element,
-  selectors: SelectorConfig,
-  baseUrl: URL
+  el: cheerio.Cheerio<any>,
+  fields: RouteFieldMapping,
+  baseUrl: string
 ): FeedItem {
-  const $el = $(el);
-  const fields = selectors.fields;
+  const item: FeedItem = {
+    title: extractField(el, fields.title),
+    link: resolveUrl(extractField(el, fields.link, 'href'), baseUrl),
+  };
 
-  const title = extractField($, $el, fields.title);
-  const rawLink = extractField($, $el, fields.link, 'href');
-  const link = resolveUrl(rawLink, baseUrl);
-  const description = fields.description ? extractField($, $el, fields.description) : undefined;
-  const pubDate = fields.pubDate ? extractField($, $el, fields.pubDate) : undefined;
-  const author = fields.author ? extractField($, $el, fields.author) : undefined;
-  const category = fields.category ? extractField($, $el, fields.category) : undefined;
+  if (fields.description) {
+    item.description = extractField(el, fields.description, 'text', true);
+  }
+  if (fields.pubDate) {
+    item.pubDate = extractField(el, fields.pubDate, 'datetime');
+  }
+  if (fields.author) {
+    item.author = extractField(el, fields.author);
+  }
+  if (fields.category) {
+    item.category = extractField(el, fields.category);
+  }
+  if (fields.guid) {
+    item.guid = extractField(el, fields.guid, 'href');
+  } else {
+    item.guid = item.link;
+  }
 
-  return { title, link, description, pubDate, author, category };
+  return item;
 }
 
 function extractField(
-  $: cheerio.CheerioAPI,
-  $el: cheerio.Cheerio<Element>,
+  el: cheerio.Cheerio<any>,
   selector: string,
-  attr?: string
+  defaultAttr?: string,
+  allowHtml?: boolean
 ): string {
-  if (selector.startsWith('@')) {
-    return $el.attr(selector.slice(1)) || '';
+  // Support "selector@attr" syntax: "a.title@href"
+  const attrMatch = selector.match(/^(.+?)@(\w+)$/);
+  if (attrMatch) {
+    const [, sel, attr] = attrMatch;
+    const target = sel === '&' ? el : el.find(sel);
+    return (target.attr(attr) ?? '').trim();
   }
 
-  const parts = selector.split('|').map(s => s.trim());
-  const cssSelector = parts[0];
-  const attribute = parts[1] || attr;
-
-  const target = cssSelector === '&' ? $el : $el.find(cssSelector);
-
-  if (attribute) {
-    return (target.attr(attribute) || '').trim();
+  // Support "selector|text" or "selector|html"
+  const pipeMatch = selector.match(/^(.+?)\|(\w+)$/);
+  if (pipeMatch) {
+    const [, sel, mode] = pipeMatch;
+    const target = sel === '&' ? el : el.find(sel);
+    if (mode === 'html') return (target.html() ?? '').trim();
+    return (target.text() ?? '').trim();
   }
-  return (target.text() || '').trim();
+
+  // Default: try attr if specified, fall back to text
+  const target = selector === '&' ? el : el.find(selector);
+  if (defaultAttr && defaultAttr !== 'text') {
+    const attrVal = target.attr(defaultAttr);
+    if (attrVal) return attrVal.trim();
+  }
+
+  return allowHtml
+    ? (target.html() ?? '').trim()
+    : (target.text() ?? '').trim();
 }
 
-function resolveUrl(url: string, base: URL): string {
+function resolveUrl(url: string, baseUrl: string): string {
   if (!url) return '';
   if (url.startsWith('http://') || url.startsWith('https://')) return url;
-  if (url.startsWith('//')) return `${base.protocol}${url}`;
-  if (url.startsWith('/')) return `${base.origin}${url}`;
-  return `${base.origin}/${url}`;
+  try {
+    return new URL(url, baseUrl).href;
+  } catch {
+    return url;
+  }
 }
